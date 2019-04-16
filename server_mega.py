@@ -35,10 +35,12 @@ def clientthread(conn, addr, rank):
 
             from_rank = pickled_message[0]
             to_rank = pickled_message[1]
-            info = pickled_message[2]
+            type_msg = pickled_message[2]
+            info = pickled_message[3]
 
             print('from ' + str(from_rank))
             print('to ' + str(to_rank))
+            print('type ' + str(type_msg))
             print('info ' + str(info))
 
             # send to specified rank

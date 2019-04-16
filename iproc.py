@@ -9,23 +9,25 @@ if __name__ == '__main__':
 
     print('rank %d, size %d' % (rank, size))
 
-    print('rank %d sleeping 10s...' % rank)
-    time.sleep(10)
+    print('rank %d sleeping 4s...' % rank)
+    time.sleep(4)
     print('rank %d woke up' % rank)
 
     if rank == 0:
         print('sending...')
-        SMPI_send(1, ['hello', 'its', 'me'])
+        SMPI_isend(1, ['hello', 'its', 'me'], i_id=0)
         print('sent')
+
+        print('wait received ', SMPI_wait(i_id=0))
 
     if rank == 1:
         print('rank %d sleeping another 10s...' % rank)
         time.sleep(10)
         print('rank %d woke up' % rank)
         
-        msg = SMPI_recv(0)
+        SMPI_irecv(0, i_id=1)
 
-        print('received: ', msg)
+        print('wait received ', SMPI_wait(i_id=1))
 
     SMPI_finalize()
 
