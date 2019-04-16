@@ -283,32 +283,5 @@ def SMPI_wait(i_id):
     """
     while(i_id not in i_buffer.keys()):
         continue
-        
+
     return i_buffer[i_id]
-    
-
-
-
-
-    
-
-
-
-    # data = pickle.loads(s.recv(1024))
-    # print('Received', repr(data))
-
-    # print('sleep 10s.')
-    # time.sleep(10)
-    # print('end sleep')
-
-    # #  send
-    # s.sendall(pickle.dumps([0, 1, [1,2,3,4,5]]))
-
-    # # receive
-    # # data = pickle.loads(s.recv(1024))
-    # # print('Received', repr(data))
-
-    # # sleep
-    # print('sleep 60s.')
-    # time.sleep(60)
-    # print('end sleep')
