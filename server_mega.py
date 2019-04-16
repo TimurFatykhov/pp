@@ -31,22 +31,18 @@ def clientthread(conn, addr, rank):
     while True:
         message = conn.recv(2048)
         if message: 
-            message = pickle.loads(message)
+            pickled_message = pickle.loads(message)
 
-            from_rank = message[0]
-            to_rank = message[1]
-            info = message[2]
+            from_rank = pickled_message[0]
+            to_rank = pickled_message[1]
+            info = pickled_message[2]
 
             print('from ' + str(from_rank))
             print('to ' + str(to_rank))
             print('info ' + str(info))
 
-            # Calls broadcast function to send message to all 
-            message_to_send = pickle.dumps(info)
-            # broadcast(message_to_send, conn) 
-
             # send to specified rank
-            dict_of_clients[to_rank].sendall(message_to_send)
+            dict_of_clients[to_rank].sendall(message)
         else: 
             # message may have no content if the connection 
             # is broken, in this case we close the connection
