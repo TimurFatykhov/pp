@@ -5,6 +5,7 @@ import sys
 import threading
 import pickle
 import argparse
+import time
 
 # parse option with number of clients
 parser = argparse.ArgumentParser()
@@ -31,6 +32,7 @@ def clientthread(conn, addr, rank):
 
     while True:
         message = conn.recv(2048)
+        # print(message)
         if message: 
             pickled_message = pickle.loads(message)
 
@@ -39,9 +41,9 @@ def clientthread(conn, addr, rank):
             type_msg = pickled_message[2]
             info = pickled_message[3]
 
-            # print('from ' + str(from_rank))
-            # print('to ' + str(to_rank))
-            # print('type ' + str(type_msg))
+            # print('from ' + str(from_rank), end=' ')
+            # print('to ' + str(to_rank), end=' ')
+            # print('type ' + str(type_msg), end=' ')
             # print('info ' + str(info))
 
             # send to specified rank
@@ -52,6 +54,7 @@ def clientthread(conn, addr, rank):
             # end kill the thread
             
             # print('connections refused!')
+            time.sleep(1)
             conn.close()
             return 0
 

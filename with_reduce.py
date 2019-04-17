@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from smpi import *
 import time
 import pickle

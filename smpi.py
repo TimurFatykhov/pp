@@ -57,7 +57,9 @@ def SMPI_send(send_to_rank, message):
 
     # recv confirmation
     if recv_confirm_buffer[rank]:
-        return recv_confirm_buffer[rank].pop(0)
+        if recv_confirm_buffer[rank][2] == 1:
+            # it is confirmation message
+            return recv_confirm_buffer[rank].pop(0)[3]
 
     while True:
         msg_received = socket_to_server.recv(1024)
@@ -74,13 +76,13 @@ def SMPI_send(send_to_rank, message):
         if type_msg == 0:
             # if it is not confirmation message,
             # put it into msg_buffer
-            recv_msg_buffer[recv_from].append(clear_msg)
+            recv_msg_buffer[recv_from].append(msg_received)
             continue
 
         if send_to_rank != recv_from:
             # if confirmation message was sent from another, 
             # then put it into buffer
-            recv_confirm_buffer[recv_from].append(clear_msg)
+            recv_confirm_buffer[recv_from].append(msg_received)
         else:
             # 'type_smg' is confirmation and 
             # 'recv_from' is equal to 'send_to_rank'
@@ -98,7 +100,10 @@ def SMPI_recv(from_rank):
     # if we have messages in buffer from this rank, 
     # then return first message in queue
     if recv_msg_buffer[from_rank]:
-        return recv_msg_buffer[from_rank].pop(0)
+        for i, msg in recv_msg_buffer[from_rank]:
+            if msg[2] != 1:
+                # not confirmation message
+                return recv_msg_buffer[from_rank].pop(i)[3]
 
     while True:
         msg_received = socket_to_server.recv(1024)
@@ -115,7 +120,7 @@ def SMPI_recv(from_rank):
         if type_msg == 1:
             # if it is confirmation message,
             # put it into conf_buffer
-            recv_confirm_buffer[recv_from].append(clear_msg)
+            recv_confirm_buffer[recv_from].append(msg_received)
             continue
 
         if from_rank != recv_from:
@@ -125,7 +130,7 @@ def SMPI_recv(from_rank):
             __send_confirmation__(recv_from)
         else:
             __send_confirmation__(recv_from)
-            return msg_received
+            return clear_msg
 
 
 def SMPI_finalize():
@@ -177,8 +182,12 @@ def __irecv__(from_rank, i_id):
     # if we have messages in buffer from this rank, 
     # then return first message in queue
     if recv_msg_buffer[from_rank]:
-        i_buffer[i_id] = recv_msg_buffer[from_rank].pop(0)[3] # [3] - clear message
-        return 0
+        for i, msg in enumerate(recv_msg_buffer[from_rank]):
+            # пробегаемся по всем сообщениям в буфере
+            if msg[2] != 1:
+                # not confirmation message
+                i_buffer[i_id] = recv_msg_buffer[from_rank].pop(i)[3] # [3] - clear message
+                return 0
 
     while True:
         msg_received = socket_to_server.recv(1024)
@@ -195,13 +204,13 @@ def __irecv__(from_rank, i_id):
         if type_msg == 1:
             # if it is confirmation message,
             # put it into conf_buffer
-            recv_confirm_buffer[recv_from].append(clear_msg)
+            recv_confirm_buffer[recv_from].append(msg_received)
             continue
 
         if from_rank != recv_from:
             # if message was sent from another, 
             # then put it into buffer
-            recv_msg_buffer[recv_from].append(clear_msg)
+            recv_msg_buffer[recv_from].append(msg_received)
             __send_confirmation__(recv_from)
         else:
             __send_confirmation__(recv_from)
@@ -228,9 +237,13 @@ def __isend__(send_to_rank, message, i_id):
     socket_to_server.sendall(msg_to_send)
 
     # recv confirmation
-    if recv_confirm_buffer[rank]:
-        i_buffer[i_id] = recv_confirm_buffer[rank].pop(0)[3] # 3 - clear message
-        return 0
+    if recv_msg_buffer[send_to_rank]:
+        for i, msg in enumerate(recv_msg_buffer[send_to_rank]):
+            # пробегаемся по всем сообщениям в буфере
+            if msg[2] == 0:
+                # confirmation message
+                i_buffer[i_id] = recv_msg_buffer[send_to_rank].pop(i)[3] # [3] - clear message
+                return 0
 
     while True:
         msg_received = socket_to_server.recv(1024)
@@ -247,7 +260,7 @@ def __isend__(send_to_rank, message, i_id):
         if type_msg == 0:
             # if it is not confirmation message,
             # put it into msg_buffer
-            recv_msg_buffer[recv_from].append(clear_msg)
+            recv_msg_buffer[recv_from].append(msg_received)
             continue
 
         if send_to_rank != recv_from:
