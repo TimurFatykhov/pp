@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import socket 
 import select 
 import sys 
@@ -38,10 +39,10 @@ def clientthread(conn, addr, rank):
             type_msg = pickled_message[2]
             info = pickled_message[3]
 
-            print('from ' + str(from_rank))
-            print('to ' + str(to_rank))
-            print('type ' + str(type_msg))
-            print('info ' + str(info))
+            # print('from ' + str(from_rank))
+            # print('to ' + str(to_rank))
+            # print('type ' + str(type_msg))
+            # print('info ' + str(info))
 
             # send to specified rank
             dict_of_clients[to_rank].sendall(message)
@@ -49,7 +50,8 @@ def clientthread(conn, addr, rank):
             # message may have no content if the connection 
             # is broken, in this case we close the connection
             # end kill the thread
-            print('connections refused!')
+            
+            # print('connections refused!')
             conn.close()
             return 0
 
@@ -63,7 +65,7 @@ while True:
     dict_of_clients[num_of_clients] = conn
   
     # prints the address of the user that just connected 
-    print(addr[0] + ':' + str(addr[1]) + " connected")
+    # print(addr[0] + ':' + str(addr[1]) + " connected")
   
     # creates and individual thread for every user  
     # that connects 

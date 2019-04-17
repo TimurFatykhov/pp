@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 from smpi import *
 import time
 import pickle
+
 
 if __name__ == '__main__':
     SMPI_init()

@@ -49,7 +49,6 @@ def SMPI_get_size():
 
 def SMPI_send(send_to_rank, message):
     """
-    To be honest this function is SMPI_isend
     """
     type_msg = 0 # 0 - message, 1 - confirmation
     msg_to_send = [rank, send_to_rank, type_msg, message]
