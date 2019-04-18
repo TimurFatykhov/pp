@@ -9,6 +9,7 @@ If ```verbose``` is 1, then server will print logs.
 ```
 python3 my_smpi_script.py
 ```
+<br><br><br>
 ### How to (unix)
 #### Run shell
 ```
