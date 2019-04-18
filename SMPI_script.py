@@ -12,7 +12,7 @@ size = comm.get_size()
     Определяем параметры задачи
 """
 # размерность матрицы
-N = 1000
+N = 100
 # величина невязки, при которой закончим алгоритм
 eps = 1e-5
 # максимальное кол-во сделанных итераций
@@ -104,10 +104,10 @@ while flag:
                 # самому себе не отправляем
                 continue
 
-            comm.send(flag, dest = r)
+            comm.send(to_rank = r, message = flag)
 
     if rank != 0:
         # ждем от нулевого ранга новое значение флага
-        flag = comm.recv(source = 0)
+        flag = comm.recv(from_rank = 0)
 
 print("\n\nrank = " + str(rank) + "\nx =\n" + str(x_curr) + "\ntime = " + str(time.time() - start_time) + " s")

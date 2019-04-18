@@ -13,15 +13,19 @@ def __isend__(conn, message, que):
 
 
 def __irecv__(conn, que):
-    data = b""
-    while True:
-        batch = conn.recv(4096)
-        if not batch: 
-            break
-        data += batch
+    # data = b""
+    # while True:
+    #     batch = conn.recv(4096)
+    #     if not batch: 
+    #         break
+    #     data += batch
 
-    data = pickle.loads(data)
-    que.put(data)
+    data = conn.recv(4096)
+    if data:
+        data = pickle.loads(data)
+        que.put(data)
+    else:
+        que.put(None)
 
 
 class COMM_WORLD():
@@ -181,20 +185,10 @@ class COMM_WORLD():
             for p in range(self.size):
                 if (p != r): # сами с собой не взаимодействуем
                     if (r == self.rank): # r шлет p и ждет ответ
-                        print('r, p',r,p)
-                        print('#1')
                         self.send(to_rank = p, message = value)
-                        print('#1.2')
-                        result.append(self.recv(from_rank = p))
-                        print('#1 end')
                         
                     if (p == self.rank): # p слушает r и отвечает
-                        print('p, r',p,r)
-                        print('#2')
                         result.append(self.recv(from_rank = r))
-                        print('#2.2')
-                        self.send(to_rank = r, message = value)
-                        print('#2 end')
 
         result.insert(self.rank, value)
 
