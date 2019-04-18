@@ -42,12 +42,15 @@ class COMM_WORLD():
 
         # extract list of listening ranks
         listening_list = msg[3] # [rank, addr]
+
+        # print('rank | listening', self. rank, listening_list)
+
         # connect to all waiting proceses
         self.world = {}
-        for i, peer in listening_list:
+        for i, peer_addr in listening_list:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((peer[0], peer[1]))
-            self.world[i] = s
+            s.connect((peer_addr[0], peer_addr[1]))
+            self.world[i] = [s, peer_addr[0], peer_addr[1]]
         
 
         # create server for listening other ("older") processes
@@ -57,8 +60,10 @@ class COMM_WORLD():
             server.bind((self.my_ip, self.my_port)) 
             server.listen(self.size)  
             for i in range(self.rank + 1, self.size):
-                conn, _ = server.accept() 
-                self.world[i] = conn
+                conn, addr = server.accept() 
+                self.world[i] = [conn, addr[0], addr[1]]
+
+        # print('rank | world', self. rank, self.world)
         
 
     def get_rank(self):
@@ -71,7 +76,7 @@ class COMM_WORLD():
     
     def send(self, to_rank, message):
         message = pickle.dumps(message)
-        self.world[to_rank].sendall(message)
+        self.world[to_rank][0].sendall(message)
         return 0
 
 
@@ -80,7 +85,7 @@ class COMM_WORLD():
         # print('size ', sys.getsizeof(message))
         data = b""
         while True:
-            batch = self.world[from_rank].recv(4096)
+            batch = self.world[from_rank][0].recv(4096)
             if not batch: 
                 break
             data += batch
@@ -106,7 +111,9 @@ class COMM_WORLD():
         """
 
         if self.rank != root:
+            print('#%d i am sending' % self.rank)
             self.send(to_rank = root, message = value)
+            print('#%d i sent' % self.rank)
         else:
             values = []
             values.append(value)
@@ -139,7 +146,7 @@ class COMM_WORLD():
 
     def isend(self, to_rank, message):
         que = Queue()
-        p = Process(target=__isend__, args=(self.world[to_rank], message,que))
+        p = Process(target=__isend__, args=(self.world[to_rank][0], message,que))
         p.start()
 
         def wait():
@@ -151,7 +158,7 @@ class COMM_WORLD():
 
     def irecv(self, from_rank):
         que = Queue()
-        p = Process(target=__irecv__, args=(self.world[from_rank], que))
+        p = Process(target=__irecv__, args=(self.world[from_rank][0], que))
         p.start()
 
         def wait():
@@ -159,3 +166,28 @@ class COMM_WORLD():
 
         que.wait = wait
         return que
+
+    
+    def allgather(self, value):
+        result = []
+        
+        for r in range(self.size):
+            for p in range(self.size):
+                if (p != r): # сами с собой не взаимодействуем
+                    if (r == self.rank): # r шлет p и ждет ответ
+                        print('#1')
+                        self.send(to_rank = p, message = value)
+                        print('#1.2')
+                        result.append(self.recv(from_rank = p))
+                        print('#1 end')
+                        
+                    if (p == self.rank): # p слушает r и отвечает
+                        print('#2')
+                        result.append(self.recv(from_rank = r))
+                        print('#2.2')
+                        self.send(to_rank = r, message = value)
+                        print('#2 end')
+
+        result.insert(self.rank, value)
+
+        return result
