@@ -4,7 +4,7 @@
 ```
 python3 init_server.py --n **number_of_processes** --v **verbose**
 ```
-If ```verbose``` is 1, then server will print logs. With 0 won't.
+If ```verbose``` is 1, then server will print logs. If set to 0 won't.
 #### Run processes
 ```
 python3 my_smpi_script.py
@@ -15,7 +15,7 @@ python3 my_smpi_script.py
 ```
 sh mpi_run_bash.sh **number_of_processes** **verbose** **script_name**
 ```
-If ```verbose``` is 1, then server will print logs. With 0 won't.
+If ```verbose``` is 1, then server will print logs. If set to 0 won't.
 <br><br>Example:
 ```
 sh mpi_run.sh 2 0 script.py
