@@ -83,15 +83,21 @@ class COMM_WORLD():
     def recv(self, from_rank):
         # message = 
         # print('size ', sys.getsizeof(message))
-        data = b""
-        while True:
-            batch = self.world[from_rank][0].recv(4096)
-            if not batch: 
-                break
-            data += batch
+        # data = b""
+        # while True:
+        #     print("#1111111")
+        #     batch = self.world[from_rank][0].recv(4096)
+        #     print("#2222222")
+        #     if not batch: 
+        #         break
+        #     data += batch
 
-        data = pickle.loads(data)
-        return data
+        data = self.world[from_rank][0].recv(4096)
+        if data:
+            data = pickle.loads(data)
+            return data
+        else:
+            return None
 
     
     def reduce(self, value, root, op='sum'):
@@ -175,6 +181,7 @@ class COMM_WORLD():
             for p in range(self.size):
                 if (p != r): # сами с собой не взаимодействуем
                     if (r == self.rank): # r шлет p и ждет ответ
+                        print('r, p',r,p)
                         print('#1')
                         self.send(to_rank = p, message = value)
                         print('#1.2')
@@ -182,6 +189,7 @@ class COMM_WORLD():
                         print('#1 end')
                         
                     if (p == self.rank): # p слушает r и отвечает
+                        print('p, r',p,r)
                         print('#2')
                         result.append(self.recv(from_rank = r))
                         print('#2.2')
