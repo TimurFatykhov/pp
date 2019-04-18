@@ -1,299 +1,111 @@
-# semi mpi
+#!/usr/bin/env python3
 import socket
 import pickle
 import numpy as np
 import threading
 
-rank = None
-size = None
-socket_to_server = None
 
-recv_msg_buffer = {}
-recv_confirm_buffer = {}
+class COMM_WORLD():
+    def __init__(self, host='127.0.0.1', port=61200, buff_size=1024):
+        self.buff_size = buff_size
 
-def __connect_to_server__(host='127.0.0.1', port=8080):
-    """
-    Returns:
-    --------
-    - s: connected socket
-        now you can use s.sendall(), s.recv()
-    """
-    global rank, size
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((host, port))
+        msg = s.recv(buff_size)
+        msg = pickle.loads(msg) # parse
+        s.close()
 
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host, port))
-    msg = s.recv(1024)
-    msg = pickle.loads(msg)
+        addr = msg[0]
+        self.my_ip = addr[0]
+        self.my_port = addr[1]
 
-    rank = int(msg[0])
-    size = int(msg[1])
+        self.rank = int(msg[1])
+        self.size = int(msg[2])
 
-    return s
-
-def SMPI_init():
-    global socket_to_server
-    socket_to_server = __connect_to_server__()
-
-    for i in range(size):
-        recv_msg_buffer[i] = []
-        recv_confirm_buffer[i] = []
-
-
-def SMPI_get_rank():
-    return rank
-
-
-def SMPI_get_size():
-    return size
-
-
-def SMPI_send(send_to_rank, message):
-    """
-    """
-    type_msg = 0 # 0 - message, 1 - confirmation
-    msg_to_send = [rank, send_to_rank, type_msg, message]
-    msg_to_send = pickle.dumps(msg_to_send)
-    socket_to_server.sendall(msg_to_send)
-
-    # recv confirmation
-    if recv_confirm_buffer[rank]:
-        if recv_confirm_buffer[rank][2] == 1:
-            # it is confirmation message
-            return recv_confirm_buffer[rank].pop(0)[3]
-
-    while True:
-        msg_received = socket_to_server.recv(1024)
-        msg_received = pickle.loads(msg_received)
-
-        recv_from = msg_received[0]
-        msg_to = msg_received[1]
-        type_msg = msg_received[2]
-        clear_msg = msg_received[3]
-
-        if msg_to != rank:
-            ValueError('Message was sent to another rank!')
-
-        if type_msg == 0:
-            # if it is not confirmation message,
-            # put it into msg_buffer
-            recv_msg_buffer[recv_from].append(msg_received)
-            continue
-
-        if send_to_rank != recv_from:
-            # if confirmation message was sent from another, 
-            # then put it into buffer
-            recv_confirm_buffer[recv_from].append(msg_received)
-        else:
-            # 'type_smg' is confirmation and 
-            # 'recv_from' is equal to 'send_to_rank'
-            return 0
-
-
-def __send_confirmation__(to):
-    type_msg = 1 # 0 - message, 1 - confirmation
-    msg_to_send = [rank, to, type_msg, 'confirmation']
-    msg_to_send = pickle.dumps(msg_to_send)
-    socket_to_server.sendall(msg_to_send)
-
-
-def SMPI_recv(from_rank):
-    # if we have messages in buffer from this rank, 
-    # then return first message in queue
-    if recv_msg_buffer[from_rank]:
-        for i, msg in recv_msg_buffer[from_rank]:
-            if msg[2] != 1:
-                # not confirmation message
-                return recv_msg_buffer[from_rank].pop(i)[3]
-
-    while True:
-        msg_received = socket_to_server.recv(1024)
-        msg_received = pickle.loads(msg_received)
-
-        recv_from = msg_received[0]
-        to_rank = msg_received[1]
-        type_msg = msg_received[2]
-        clear_msg = msg_received[3]
-
-        if to_rank != rank:
-            ValueError('Message was sent to another rank!')
-
-        if type_msg == 1:
-            # if it is confirmation message,
-            # put it into conf_buffer
-            recv_confirm_buffer[recv_from].append(msg_received)
-            continue
-
-        if from_rank != recv_from:
-            # if message was sent from another, 
-            # then put it into buffer
-            recv_msg_buffer[recv_from].append(clear_msg)
-            __send_confirmation__(recv_from)
-        else:
-            __send_confirmation__(recv_from)
-            return clear_msg
-
-
-def SMPI_finalize():
-    socket_to_server.close()
-
-SMPI_SUM, SMPI_MUL = 1, 2
-def SMPI_reduce(array, root, op):
-    arrays = []
-    if rank == root:
-        arrays.append(array)
-
-        # receive arrays from other ranks
-        for i in range(size):
-            if i == rank:
-                # skip itself
-                continue
-
-            arrays.append(SMPI_recv(i)[2]) # [2] - store the message (array)
-    
-        if op == SMPI_SUM:
-            return list(np.sum(arrays, 0))
+        # extract list of listening ranks
+        listening_list = msg[3] # [rank, addr]
+        # connect to all waiting proceses
+        self.world = {}
+        for i, peer in listening_list:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((peer[0], peer[1]))
+            self.world[i] = s
         
-        if op == SMPI_MUL:
-            return list(np.prod(arrays, 0))
-    else:
-        SMPI_send(root, array)
+
+        # create server for listening other ("older") processes
+        if self.rank + 1 < self.size:
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((self.my_ip, self.my_port)) 
+            server.listen(self.size)  
+            for i in range(self.rank + 1, self.size):
+                conn, _ = server.accept() 
+                self.world[i] = conn
+        
+
+    def get_rank(self):
+        return self.rank
+
+
+    def get_size(self):
+        return self.size
+
+    
+    def send(self, to_rank, message):
+        message = pickle.dumps(message)
+        self.world[to_rank].sendall(message)
         return 0
 
 
-#########################################################################
-######################### "Non-stop" functions ##########################
-"""
-SMPI_ITYPE_RECV and SMPI_ITYPE_SEND we will use
-like tag for i_buffer records to distinguish if it
-delivery confirmation (for isend), or received message
-(for irecv)
-"""
-SMPI_ITYPE_RECV, SMPI_ITYPE_SEND = 0, 1
+    def recv(self, from_rank):
+        message = self.world[from_rank].recv(self.buff_size)
+        message = pickle.loads(message)
+        return message
 
-"""
-i_buffer - dict with received messages within __irecv__ (like returned)
+    
+    def reduce(self, value, root, op='sum'):
+        """
+        Parameters:
+        -----------
+        - value: array-like or scalar value
 
-key -> i_id
-value -> message
-"""
-i_buffer = {}
+        - root: integer
+            result of reduction will be sent to root process
 
-def __irecv__(from_rank, i_id):
-    # if we have messages in buffer from this rank, 
-    # then return first message in queue
-    if recv_msg_buffer[from_rank]:
-        for i, msg in enumerate(recv_msg_buffer[from_rank]):
-            # пробегаемся по всем сообщениям в буфере
-            if msg[2] != 1:
-                # not confirmation message
-                i_buffer[i_id] = recv_msg_buffer[from_rank].pop(i)[3] # [3] - clear message
-                return 0
+        - op: string
+            type of reduce operation
+            possible values: 
+                - 'sum'
+                - 'prod'
+        """
 
-    while True:
-        msg_received = socket_to_server.recv(1024)
-        msg_received = pickle.loads(msg_received)
-
-        recv_from = msg_received[0]
-        to_rank = msg_received[1]
-        type_msg = msg_received[2]
-        clear_msg = msg_received[3]
-
-        if to_rank != rank:
-            ValueError('Message was sent to another rank!')
-
-        if type_msg == 1:
-            # if it is confirmation message,
-            # put it into conf_buffer
-            recv_confirm_buffer[recv_from].append(msg_received)
-            continue
-
-        if from_rank != recv_from:
-            # if message was sent from another, 
-            # then put it into buffer
-            recv_msg_buffer[recv_from].append(msg_received)
-            __send_confirmation__(recv_from)
+        if self.rank != root:
+            self.send(to_rank = root, message = value)
         else:
-            __send_confirmation__(recv_from)
-            i_buffer[i_id] = clear_msg
-            return 0
+            values = []
+            values.append(value)
 
+            # receive arrays from other ranks
+            for i in range(self.size):
+                if i == self.rank:
+                    continue # skip itself
+                print('wait from %d' % i)
+                values.append(self.recv(from_rank = i))
+                print('received from %d' % i)
 
-def SMPI_irecv(from_rank, i_id):
-    """
-    Parameters:
-    -----------
-    - from_rank : integer
-    - i_id : integer
-    """
-    t = threading.Thread(target=__irecv__, args=(from_rank, i_id))
-    t.start()
-    return 0
+            
+            if hasattr(value, '__iter__'):
+                # if value is array-like
+                values = np.stack(values)
+                print(values)
+            else:
+                # if value is scalar
+                values = np.array(values)
+            
+            if op == 'sum':
+                return np.sum(values, 0)
+            
+            if op == 'prod':
+                return np.prod(values, 0)
 
-
-def __isend__(send_to_rank, message, i_id):
-    type_msg = 0 # 0 - message, 1 - confirmation
-    msg_to_send = [rank, send_to_rank, type_msg, message]
-    msg_to_send = pickle.dumps(msg_to_send)
-    socket_to_server.sendall(msg_to_send)
-
-    # recv confirmation
-    if recv_msg_buffer[send_to_rank]:
-        for i, msg in enumerate(recv_msg_buffer[send_to_rank]):
-            # пробегаемся по всем сообщениям в буфере
-            if msg[2] == 0:
-                # confirmation message
-                i_buffer[i_id] = recv_msg_buffer[send_to_rank].pop(i)[3] # [3] - clear message
-                return 0
-
-    while True:
-        msg_received = socket_to_server.recv(1024)
-        msg_received = pickle.loads(msg_received)
-
-        recv_from = msg_received[0]
-        msg_to = msg_received[1]
-        type_msg = msg_received[2]
-        clear_msg = msg_received[3]
-
-        if msg_to != rank:
-            ValueError('Message was sent to another rank!')
-
-        if type_msg == 0:
-            # if it is not confirmation message,
-            # put it into msg_buffer
-            recv_msg_buffer[recv_from].append(msg_received)
-            continue
-
-        if send_to_rank != recv_from:
-            # if confirmation message was sent from another, 
-            # then put it into buffer
-            recv_confirm_buffer[recv_from].append(clear_msg)
-        else:
-            # 'type_smg' is confirmation and 
-            # 'recv_from' is equal to 'send_to_rank'
-            i_buffer[i_id] = clear_msg # 'confirmed'
-            return 0
-
-
-def SMPI_isend(to_rank, message, i_id):
-    """
-    To be honest it does not work correctly
-
-    Parameters:
-    -----------
-    - to_rank : integer
-    - message : any type
-    - i_id : integer
-    """
-    t = threading.Thread(target=__isend__, args=(to_rank, message, i_id))
-    t.start()
-    return 0
-
-
-def SMPI_wait(i_id):
-    """
-    Return resul of 'i'-operation: result SMPI_isend or SMPI_irecv
-    """
-    while(i_id not in i_buffer.keys()):
-        continue
-
-    return i_buffer[i_id]
+        return None
