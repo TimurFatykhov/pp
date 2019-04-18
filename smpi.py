@@ -3,15 +3,33 @@ import socket
 import pickle
 import numpy as np
 import threading
+from multiprocessing import Process, Queue
+import sys
+
+def __isend__(conn, message, que):
+    message = pickle.dumps(message)
+    conn.sendall(message)
+    que.put('confirmed')
+
+
+def __irecv__(conn, que):
+    data = b""
+    while True:
+        batch = conn.recv(4096)
+        if not batch: 
+            break
+        data += batch
+
+    data = pickle.loads(data)
+    que.put(data)
 
 
 class COMM_WORLD():
-    def __init__(self, host='127.0.0.1', port=61200, buff_size=1024):
-        self.buff_size = buff_size
+    def __init__(self, host='127.0.0.1', port=61200):
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((host, port))
-        msg = s.recv(buff_size)
+        msg = s.recv(4096)
         msg = pickle.loads(msg) # parse
         s.close()
 
@@ -58,9 +76,17 @@ class COMM_WORLD():
 
 
     def recv(self, from_rank):
-        message = self.world[from_rank].recv(self.buff_size)
-        message = pickle.loads(message)
-        return message
+        # message = 
+        # print('size ', sys.getsizeof(message))
+        data = b""
+        while True:
+            batch = self.world[from_rank].recv(4096)
+            if not batch: 
+                break
+            data += batch
+
+        data = pickle.loads(data)
+        return data
 
     
     def reduce(self, value, root, op='sum'):
@@ -109,3 +135,27 @@ class COMM_WORLD():
                 return np.prod(values, 0)
 
         return None
+
+
+    def isend(self, to_rank, message):
+        que = Queue()
+        p = Process(target=__isend__, args=(self.world[to_rank], message,que))
+        p.start()
+
+        def wait():
+            return que.get()
+
+        que.wait = wait
+        return que
+
+
+    def irecv(self, from_rank):
+        que = Queue()
+        p = Process(target=__irecv__, args=(self.world[from_rank], que))
+        p.start()
+
+        def wait():
+            return que.get()
+
+        que.wait = wait
+        return que

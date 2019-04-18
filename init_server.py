@@ -19,7 +19,7 @@ args = parser.parse_args()
 if args.v is None:
     VERBOSE = 0
 else:
-    VERBOSE = bool(args.n)
+    VERBOSE = int(args.v)
 
 if args.n is None:
     NUM_OF_CLIENTS = 1

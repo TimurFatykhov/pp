@@ -1,7 +1,8 @@
 # run server
-python3 init_server.py --n $1 --v 1 &
+python3 init_server.py --n $1 --v $2 &
 
-for ((i = 0; i < "$(($1 + 1))"; i++))
+for ((i = 0; i < "$(($1))"; i++))
 do
-    python3 $2 &
+    python3 $3 &
 done
+wait
