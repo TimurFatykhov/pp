@@ -22,7 +22,12 @@ def __irecv__(conn, que):
             break
     if data:
         data = pickle.loads(data)
-    que.put(data)
+        que.put(data)
+        return 0
+    else:
+        que.put(None)
+        return 0
+     
 
 
 class COMM_WORLD():
@@ -149,10 +154,10 @@ class COMM_WORLD():
         p = Process(target=__isend__, args=(self.world[to_rank][0], message,que))
         p.start()
 
-        def wait():
-            return que.get()
+        # def wait():
+        #     return que.get()
 
-        que.wait = wait
+        # que.wait = wait
         return que
 
 
@@ -161,10 +166,10 @@ class COMM_WORLD():
         p = Process(target=__irecv__, args=(self.world[from_rank][0], que))
         p.start()
 
-        def wait():
-            return que.get()
+        # def wait():
+        #     return que.get()
 
-        que.wait = wait
+        # que.wait = wait
         return que
 
     
