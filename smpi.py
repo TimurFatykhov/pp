@@ -15,12 +15,13 @@ def __isend__(conn, message, que):
 def __irecv__(conn, que):
     data = b''
     while True:
-        part = self.world[from_rank][0].recv(4096)
+        part = conn.recv(4096)
         data += part
         if len(part) < 4096:
             # either 0 or end of data
             break
-    data = pickle.loads(data)
+    if data:
+        data = pickle.loads(data)
     que.put(data)
 
 
@@ -88,7 +89,8 @@ class COMM_WORLD():
             if len(part) < 4096:
                 # either 0 or end of data
                 break
-        data = pickle.loads(data)
+        if data:
+            data = pickle.loads(data)
         return data
 
     
