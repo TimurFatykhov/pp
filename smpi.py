@@ -13,19 +13,15 @@ def __isend__(conn, message, que):
 
 
 def __irecv__(conn, que):
-    # data = b""
-    # while True:
-    #     batch = conn.recv(4096)
-    #     if not batch: 
-    #         break
-    #     data += batch
-
-    data = conn.recv(4096)
-    if data:
-        data = pickle.loads(data)
-        que.put(data)
-    else:
-        que.put(None)
+    data = b''
+    while True:
+        part = self.world[from_rank][0].recv(4096)
+        data += part
+        if len(part) < 4096:
+            # either 0 or end of data
+            break
+    data = pickle.loads(data)
+    que.put(data)
 
 
 class COMM_WORLD():
@@ -85,23 +81,15 @@ class COMM_WORLD():
 
 
     def recv(self, from_rank):
-        # message = 
-        # print('size ', sys.getsizeof(message))
-        # data = b""
-        # while True:
-        #     print("#1111111")
-        #     batch = self.world[from_rank][0].recv(4096)
-        #     print("#2222222")
-        #     if not batch: 
-        #         break
-        #     data += batch
-
-        data = self.world[from_rank][0].recv(4096)
-        if data:
-            data = pickle.loads(data)
-            return data
-        else:
-            return None
+        data = b''
+        while True:
+            part = self.world[from_rank][0].recv(4096)
+            data += part
+            if len(part) < 4096:
+                # either 0 or end of data
+                break
+        data = pickle.loads(data)
+        return data
 
     
     def reduce(self, value, root, op='sum'):
